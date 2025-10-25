@@ -67,9 +67,13 @@ class PIPVideoBrowser(QMainWindow):
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: rgba(0, 0, 0, 0.9);
+                background-color: rgba(100, 150, 255, 0.8);
+            }
+            QPushButton:pressed {
+                background-color: rgba(80, 120, 200, 0.9);
             }
         """)
+        self.maximize_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.maximize_btn.clicked.connect(self.toggle_mode)
         main_layout.addWidget(self.maximize_btn)
         
@@ -79,18 +83,42 @@ class PIPVideoBrowser(QMainWindow):
         control_layout.setContentsMargins(5, 5, 5, 5)
         control_layout.setSpacing(5)
         
+        # Button styling
+        button_style = """
+            QPushButton {
+                background-color: rgba(0, 0, 0, 0.7);
+                color: white;
+                border: none;
+                border-radius: 4px;
+                font-weight: bold;
+                padding: 5px;
+            }
+            QPushButton:hover {
+                background-color: rgba(100, 150, 255, 0.8);
+            }
+            QPushButton:pressed {
+                background-color: rgba(80, 120, 200, 0.9);
+            }
+        """
+        
         self.back_btn = QPushButton("◀")
         self.back_btn.setMaximumWidth(35)
+        self.back_btn.setStyleSheet(button_style)
+        self.back_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.back_btn.clicked.connect(self.web_view.back)
         control_layout.addWidget(self.back_btn)
         
         self.forward_btn = QPushButton("▶")
         self.forward_btn.setMaximumWidth(35)
+        self.forward_btn.setStyleSheet(button_style)
+        self.forward_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.forward_btn.clicked.connect(self.web_view.forward)
         control_layout.addWidget(self.forward_btn)
         
         self.refresh_btn = QPushButton("⟳")
         self.refresh_btn.setMaximumWidth(35)
+        self.refresh_btn.setStyleSheet(button_style)
+        self.refresh_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.refresh_btn.clicked.connect(self.web_view.reload)
         control_layout.addWidget(self.refresh_btn)
         
@@ -101,11 +129,15 @@ class PIPVideoBrowser(QMainWindow):
         
         self.minimize_btn = QPushButton("−")
         self.minimize_btn.setMaximumWidth(35)
+        self.minimize_btn.setStyleSheet(button_style)
+        self.minimize_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.minimize_btn.clicked.connect(self.toggle_mode)
         control_layout.addWidget(self.minimize_btn)
         
         self.close_btn = QPushButton("✕")
         self.close_btn.setMaximumWidth(35)
+        self.close_btn.setStyleSheet(button_style)
+        self.close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.close_btn.clicked.connect(self.close)
         control_layout.addWidget(self.close_btn)
         
