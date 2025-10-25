@@ -180,9 +180,10 @@ class ConfigDialog(QDialog):
 
 
 class PIPVideoBrowser(QMainWindow):
-    def __init__(self):
+    def __init__(self, start_url=None):
         super().__init__()
         self.is_maximized_mode = False
+        self.start_url = start_url or "https://youtube.com"
         self.config_file = Path.home() / ".pip_video_browser" / "config.json"
         self.config_file.parent.mkdir(parents=True, exist_ok=True)
         
@@ -437,7 +438,7 @@ class PIPVideoBrowser(QMainWindow):
         self.set_compact_mode()
         
         # Load default URL
-        self.web_view.setUrl(QUrl("https://youtube.com"))
+        self.web_view.setUrl(QUrl(self.start_url))
 
     def set_compact_mode(self):
         """Switch to compact mode (minimal UI)"""
@@ -566,7 +567,7 @@ class PIPVideoBrowser(QMainWindow):
             "width": self.width(),
             "height": self.height(),
             "is_maximized": self.is_maximized_mode,
-            "url": self.url_bar.text() or "https://youtube.com"
+            "url": self.url_bar.text() or self.start_url
         }
         with open(self.config_file, "w") as f:
             json.dump(state, f, indent=2)
@@ -585,7 +586,7 @@ class PIPVideoBrowser(QMainWindow):
                 else:
                     self.set_compact_mode()
                     
-                self.web_view.setUrl(QUrl("https://youtube.com"))
+                self.web_view.setUrl(QUrl(self.start_url))
             except Exception as e:
                 print(f"Error loading state: {e}")
         else:
@@ -602,7 +603,10 @@ class PIPVideoBrowser(QMainWindow):
 
 def main():
     app = QApplication(sys.argv)
-    browser = PIPVideoBrowser()
+    start_url = None
+    if len(sys.argv) > 1:
+        start_url = sys.argv[1]
+    browser = PIPVideoBrowser(start_url)
     browser.show()
     sys.exit(app.exec())
 
