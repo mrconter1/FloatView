@@ -372,29 +372,6 @@ class PIPVideoBrowser(QMainWindow):
         """)
         control_layout.addWidget(self.url_bar)
         
-        self.minimize_btn = QPushButton("↓")
-        self.minimize_btn.setFixedWidth(30)
-        self.minimize_btn.setFixedHeight(30)
-        self.minimize_btn.setStyleSheet("""
-            QPushButton {
-                background-color: rgba(255, 150, 0, 0.7);
-                color: white;
-                border: none;
-                border-radius: 4px;
-                font-weight: bold;
-                padding: 5px;
-            }
-            QPushButton:hover {
-                background-color: rgba(255, 180, 50, 0.9);
-            }
-            QPushButton:pressed {
-                background-color: rgba(255, 100, 0, 0.9);
-            }
-        """)
-        self.minimize_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.minimize_btn.clicked.connect(self.toggle_mode)
-        control_layout.addWidget(self.minimize_btn)
-        
         self.settings_btn = QPushButton("⚙️")
         self.settings_btn.setFixedWidth(30)
         self.settings_btn.setFixedHeight(30)
@@ -451,7 +428,7 @@ class PIPVideoBrowser(QMainWindow):
         """Switch to compact mode (minimal UI)"""
         self.is_maximized_mode = False
         self.control_bar.hide()
-        self.maximize_btn.show()
+        self.maximize_btn.hide()
         self.resize(640, 480)
         self.setWindowFlags(
             Qt.WindowType.Window |
@@ -602,39 +579,20 @@ class PIPVideoBrowser(QMainWindow):
     def handle_fullscreen_request(self, request):
         """Handle fullscreen requests from web content (YouTube, Netflix, etc.)"""
         if request.toggleOn():
-            # Entering fullscreen - accept the request and hide controls
+            # Entering fullscreen - accept the request and switch to compact mode
             request.accept()
             self.is_web_fullscreen = True
             
-            # Hide all UI controls to give maximum space to video
-            self.control_bar.hide()
-            self.maximize_btn.hide()
-            self.progress_bar.hide()
-            
-            # Optionally expand the window (but don't go to system fullscreen)
-            # Store current geometry to restore later
-            self.pre_fullscreen_geometry = self.geometry()
-            
-            # You can resize to a larger size or keep current size
-            # Uncomment the next line if you want to expand to a larger window
-            # self.resize(1280, 720)
+            # Switch to compact mode (minimal UI)
+            self.set_compact_mode()
             
         else:
-            # Exiting fullscreen - accept the request and restore controls
+            # Exiting fullscreen - accept the request and switch to maximized mode
             request.accept()
             self.is_web_fullscreen = False
             
-            # Restore the appropriate UI mode
-            if self.is_maximized_mode:
-                self.control_bar.show()
-                self.maximize_btn.hide()
-            else:
-                self.control_bar.hide()
-                self.maximize_btn.show()
-            
-            # Restore previous geometry if we changed it
-            if hasattr(self, 'pre_fullscreen_geometry'):
-                self.setGeometry(self.pre_fullscreen_geometry)
+            # Switch to maximized mode (show controls)
+            self.set_maximized_mode()
 
     def closeEvent(self, event):
         """Handle window close event"""
