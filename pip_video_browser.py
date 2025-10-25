@@ -221,9 +221,7 @@ class PIPVideoBrowser(QMainWindow):
                 else:
                     self.set_compact_mode()
                     
-                url = state.get("url", "https://youtube.com")
-                if url:
-                    self.web_view.setUrl(QUrl(url))
+                self.web_view.setUrl(QUrl("https://youtube.com"))
             except Exception as e:
                 print(f"Error loading state: {e}")
         else:
