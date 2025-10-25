@@ -22,9 +22,15 @@ class PIPVideoBrowser(QMainWindow):
         
         # Create persistent web engine profile for cookies and browser data
         storage_path = str(Path.home() / ".pip_video_browser" / "web_data")
+        cache_path = str(Path.home() / ".pip_video_browser" / "cache")
+        
+        # Create cache directories if they don't exist
+        Path(storage_path).mkdir(parents=True, exist_ok=True)
+        Path(cache_path).mkdir(parents=True, exist_ok=True)
+        
         self.profile = QWebEngineProfile("pip_video_browser", None)
         self.profile.setPersistentStoragePath(storage_path)
-        self.profile.setCachePath(str(Path.home() / ".pip_video_browser" / "cache"))
+        self.profile.setCachePath(cache_path)
         
         self.setWindowTitle("PIP Video Browser")
         self.setWindowFlags(
