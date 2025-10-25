@@ -2,6 +2,11 @@ import sys
 import json
 import os
 from pathlib import Path
+
+# Suppress Qt DPI warnings on Windows and configure WebEngine
+os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = ""
+os.environ["QT_DEBUG_PLUGINS"] = "0"
+
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QApplication, QProgressBar
 )
@@ -43,6 +48,11 @@ class PIPVideoBrowser(QMainWindow):
         self.profile.setPersistentStoragePath(storage_path)
         self.profile.setCachePath(cache_path)
         
+        # Suppress JavaScript console warnings and errors
+        self.profile.setHttpUserAgent(
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        )
+        
         self.setWindowTitle("PIP Video Browser")
         self.setWindowFlags(
             Qt.WindowType.Window | 
@@ -77,6 +87,40 @@ class PIPVideoBrowser(QMainWindow):
         # Create web engine first (needed by control buttons)
         self.web_view = QWebEngineView()
         page = QWebEnginePage(self.profile, self.web_view)
+        
+        # Inject script to suppress JavaScript console messages
+        script = """
+        (function() {
+            // Suppress console warnings and errors related to policies and headers
+            const originalWarn = console.warn;
+            const originalError = console.error;
+            
+            console.warn = function(...args) {
+                const message = args.join(' ');
+                // Filter out common browser-related warnings
+                if (message.includes('Permissions-Policy') || 
+                    message.includes('Document-Policy') ||
+                    message.includes('preload') ||
+                    message.includes('link preload')) {
+                    return;
+                }
+                originalWarn.apply(console, args);
+            };
+            
+            console.error = function(...args) {
+                const message = args.join(' ');
+                // Filter out CORS and advertisement-related errors
+                if (message.includes('CORS') || 
+                    message.includes('doubleclick.net') ||
+                    message.includes('XMLHttpRequest')) {
+                    return;
+                }
+                originalError.apply(console, args);
+            };
+        })();
+        """
+        page.runJavaScript(script)
+        
         self.web_view.setPage(page)
         
         # Compact mode button (shown in compact mode, top)
@@ -365,6 +409,9 @@ class PIPVideoBrowser(QMainWindow):
     def closeEvent(self, event):
         """Handle window close event"""
         self.save_state()
+        # Properly clean up web page before closing
+        if hasattr(self, 'web_view') and self.web_view.page():
+            self.web_view.setPage(None)
         event.accept()
 
 
