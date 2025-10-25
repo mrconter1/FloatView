@@ -147,10 +147,19 @@ class PIPVideoBrowser(QMainWindow):
 
     def navigate_to_url(self):
         """Navigate to URL from address bar"""
-        url = self.url_bar.text()
-        if not url.startswith(("http://", "https://")):
-            url = "https://" + url
-        self.web_view.setUrl(QUrl(url))
+        url = self.url_bar.text().strip()
+        if not url:
+            return
+        
+        # Check if it looks like a URL (contains a dot or is localhost)
+        if "." in url or url.lower().startswith("localhost"):
+            if not url.startswith(("http://", "https://")):
+                url = "https://" + url
+            self.web_view.setUrl(QUrl(url))
+        else:
+            # Search Google for non-URL input
+            search_url = f"https://www.google.com/search?q={url.replace(' ', '+')}"
+            self.web_view.setUrl(QUrl(search_url))
 
     def set_position(self, x, y):
         """Non-blocking position change"""
