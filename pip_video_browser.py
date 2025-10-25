@@ -217,7 +217,22 @@ class PIPVideoBrowser(QMainWindow):
         self.minimize_btn = QPushButton("↓")
         self.minimize_btn.setFixedWidth(30)
         self.minimize_btn.setFixedHeight(30)
-        self.minimize_btn.setStyleSheet(button_style)
+        self.minimize_btn.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(255, 150, 0, 0.7);
+                color: white;
+                border: none;
+                border-radius: 4px;
+                font-weight: bold;
+                padding: 5px;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 180, 50, 0.9);
+            }
+            QPushButton:pressed {
+                background-color: rgba(255, 100, 0, 0.9);
+            }
+        """)
         self.minimize_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.minimize_btn.clicked.connect(self.toggle_mode)
         control_layout.addWidget(self.minimize_btn)
