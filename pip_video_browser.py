@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import random
 
 # Suppress Qt DPI warnings on Windows and configure WebEngine
 os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = ""
@@ -200,10 +201,11 @@ class ConfigDialog(QDialog):
 
 
 class PIPVideoBrowser(QMainWindow):
-    def __init__(self, start_url=None):
+    def __init__(self, start_url=None, test_movement=False):
         super().__init__()
         self.is_maximized_mode = False
         self.is_web_fullscreen = False
+        self.test_movement = test_movement
         self.start_url = start_url or "https://youtube.com"
         self.config_file = Path.home() / ".pip_video_browser" / "config.json"
         self.config_file.parent.mkdir(parents=True, exist_ok=True)
@@ -240,6 +242,12 @@ class PIPVideoBrowser(QMainWindow):
         self.resize_timer.timeout.connect(self.update_size)
         self.move_timer = QTimer()
         self.move_timer.timeout.connect(self.update_position)
+        
+        # Test movement timer
+        if self.test_movement:
+            self.test_timer = QTimer()
+            self.test_timer.timeout.connect(self.random_move_and_resize)
+            self.test_timer.start(2500)  # Every 2.5 seconds
 
     def init_ui(self):
         """Initialize the user interface"""
@@ -552,6 +560,29 @@ class PIPVideoBrowser(QMainWindow):
             self.move(self.pending_x, self.pending_y)
             self.move_timer.stop()
 
+    def random_move_and_resize(self):
+        """Move window to random position and size (for testing) - only in compact mode"""
+        # Only move when in compact mode
+        if self.is_maximized_mode:
+            return
+        
+        # Get screen geometry
+        screen = QApplication.primaryScreen().geometry()
+        
+        # Random size (200-800 width, 150-600 height)
+        new_width = random.randint(200, 800)
+        new_height = random.randint(150, 600)
+        
+        # Random position (ensure window stays on screen)
+        max_x = screen.width() - new_width
+        max_y = screen.height() - new_height
+        new_x = random.randint(0, max(max_x, 0))
+        new_y = random.randint(0, max(max_y, 0))
+        
+        # Apply new geometry
+        self.setGeometry(new_x, new_y, new_width, new_height)
+        self.apply_rounded_corners()
+
     def set_size(self, width, height):
         """Non-blocking resize"""
         self.pending_width = width
@@ -627,10 +658,18 @@ class PIPVideoBrowser(QMainWindow):
 def main():
     app = QApplication(sys.argv)
     app.setWindowIcon(create_app_icon())
+    
     start_url = None
-    if len(sys.argv) > 1:
-        start_url = sys.argv[1]
-    browser = PIPVideoBrowser(start_url)
+    test_movement = False
+    
+    # Parse command-line arguments
+    for arg in sys.argv[1:]:
+        if arg == "--test-movement":
+            test_movement = True
+        elif not arg.startswith("--"):
+            start_url = arg
+    
+    browser = PIPVideoBrowser(start_url, test_movement)
     browser.show()
     sys.exit(app.exec())
 
