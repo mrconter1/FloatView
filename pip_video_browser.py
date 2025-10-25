@@ -42,11 +42,29 @@ class PIPVideoBrowser(QMainWindow):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
         
-        # Create web engine
+        # Create web engine first (needed by control buttons)
         self.web_view = QWebEngineView()
-        main_layout.addWidget(self.web_view)
         
-        # Control bar (hidden by default in compact mode)
+        # Compact mode button (shown in compact mode, top)
+        self.maximize_btn = QPushButton("⛶")
+        self.maximize_btn.setMaximumWidth(40)
+        self.maximize_btn.setMaximumHeight(40)
+        self.maximize_btn.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(0, 0, 0, 0.7);
+                color: white;
+                border: none;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: rgba(0, 0, 0, 0.9);
+            }
+        """)
+        self.maximize_btn.clicked.connect(self.toggle_mode)
+        main_layout.addWidget(self.maximize_btn)
+        
+        # Control bar (shown in maximized mode, top)
         self.control_bar = QWidget()
         control_layout = QHBoxLayout(self.control_bar)
         control_layout.setContentsMargins(5, 5, 5, 5)
@@ -84,23 +102,8 @@ class PIPVideoBrowser(QMainWindow):
         
         main_layout.addWidget(self.control_bar)
         
-        # Compact mode button (always visible)
-        self.maximize_btn = QPushButton("⛶")
-        self.maximize_btn.setMaximumWidth(40)
-        self.maximize_btn.setMaximumHeight(40)
-        self.maximize_btn.setStyleSheet("""
-            QPushButton {
-                background-color: rgba(0, 0, 0, 0.7);
-                color: white;
-                border: none;
-                border-radius: 4px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: rgba(0, 0, 0, 0.9);
-            }
-        """)
-        self.maximize_btn.clicked.connect(self.toggle_mode)
+        # Add web engine to layout (fills remaining space)
+        main_layout.addWidget(self.web_view, 1)
         
         main_widget.setLayout(main_layout)
         self.set_compact_mode()
@@ -126,10 +129,11 @@ class PIPVideoBrowser(QMainWindow):
         self.is_maximized_mode = True
         self.control_bar.show()
         self.maximize_btn.hide()
-        self.resize(1200, 800)
+        self.resize(900, 600)
         self.setWindowFlags(
             Qt.WindowType.Window |
-            Qt.WindowType.WindowStaysOnTopHint
+            Qt.WindowType.WindowStaysOnTopHint |
+            Qt.WindowType.FramelessWindowHint
         )
         self.show()
 
