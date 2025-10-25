@@ -10,6 +10,7 @@ from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEnginePage
 from PyQt6.QtCore import Qt, QTimer, QRect, QPoint, QSize, QUrl
 from PyQt6.QtGui import QIcon, QKeySequence
 from PyQt6.QtCore import pyqtSlot
+from PyQt6.QtGui import QPainterPath, QRegion
 
 
 class PIPVideoBrowser(QMainWindow):
@@ -44,6 +45,13 @@ class PIPVideoBrowser(QMainWindow):
         """Initialize the user interface"""
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
+        
+        # Set rounded corners on main widget
+        main_widget.setStyleSheet("""
+            QWidget {
+                border-radius: 12px;
+            }
+        """)
         
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins(0, 0, 0, 0)
@@ -125,6 +133,21 @@ class PIPVideoBrowser(QMainWindow):
         self.url_bar = QLineEdit()
         self.url_bar.setPlaceholderText("Enter URL...")
         self.url_bar.returnPressed.connect(self.navigate_to_url)
+        self.url_bar.setStyleSheet("""
+            QLineEdit {
+                border-radius: 8px;
+                padding: 5px;
+                background-color: rgba(0, 0, 0, 0.7);
+                color: white;
+                border: none;
+            }
+            QLineEdit:hover {
+                background-color: rgba(100, 150, 255, 0.8);
+            }
+            QLineEdit:focus {
+                background-color: rgba(80, 120, 200, 0.9);
+            }
+        """)
         control_layout.addWidget(self.url_bar)
         
         self.minimize_btn = QPushButton("−")
@@ -164,6 +187,7 @@ class PIPVideoBrowser(QMainWindow):
             Qt.WindowType.FramelessWindowHint
         )
         self.show()
+        self.apply_rounded_corners()
 
     def set_maximized_mode(self):
         """Switch to maximized mode (full controls)"""
@@ -177,6 +201,7 @@ class PIPVideoBrowser(QMainWindow):
             Qt.WindowType.FramelessWindowHint
         )
         self.show()
+        self.apply_rounded_corners()
 
     def toggle_mode(self):
         """Toggle between compact and maximized modes"""
@@ -185,6 +210,24 @@ class PIPVideoBrowser(QMainWindow):
         else:
             self.set_maximized_mode()
         self.save_state()
+
+    def apply_rounded_corners(self):
+        """Apply rounded corners to the window with antialiasing"""
+        from PyQt6.QtGui import QBitmap, QPainter
+        
+        # Create a bitmap mask
+        mask = QBitmap(self.size())
+        mask.fill(Qt.GlobalColor.white)
+        
+        # Draw rounded rectangle on the bitmap with antialiasing
+        painter = QPainter(mask)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
+        painter.setBrush(Qt.GlobalColor.black)
+        painter.drawRoundedRect(0, 0, self.width(), self.height(), 6, 6)
+        painter.end()
+        
+        self.setMask(mask)
 
     def navigate_to_url(self):
         """Navigate to URL from address bar"""
