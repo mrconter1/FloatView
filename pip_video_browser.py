@@ -138,6 +138,9 @@ class ConfigDialog(QDialog):
     
     def clear_cache(self):
         """Clear browser cache"""
+        reply = QMessageBox.question(self, "Confirm", "Are you sure you want to clear the browser cache?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if reply != QMessageBox.StandardButton.Yes:
+            return
         try:
             if os.path.exists(self.cache_path):
                 shutil.rmtree(self.cache_path)
@@ -151,6 +154,9 @@ class ConfigDialog(QDialog):
     
     def clear_cookies(self):
         """Clear cookies"""
+        reply = QMessageBox.question(self, "Confirm", "Are you sure you want to clear cookies?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if reply != QMessageBox.StandardButton.Yes:
+            return
         try:
             if os.path.exists(self.storage_path):
                 shutil.rmtree(self.storage_path)
