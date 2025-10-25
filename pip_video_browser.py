@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QApplication
 )
 from PyQt6.QtWebEngineWidgets import QWebEngineView
+from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEnginePage
 from PyQt6.QtCore import Qt, QTimer, QRect, QPoint, QSize, QUrl
 from PyQt6.QtGui import QIcon, QKeySequence
 from PyQt6.QtCore import pyqtSlot
@@ -17,6 +18,12 @@ class PIPVideoBrowser(QMainWindow):
         self.is_maximized_mode = False
         self.config_file = Path.home() / ".pip_video_browser" / "config.json"
         self.config_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Create persistent web engine profile for cookies and browser data
+        storage_path = str(Path.home() / ".pip_video_browser" / "web_data")
+        self.profile = QWebEngineProfile("pip_video_browser", None)
+        self.profile.setPersistentStoragePath(storage_path)
+        self.profile.setCachePath(str(Path.home() / ".pip_video_browser" / "cache"))
         
         self.setWindowTitle("PIP Video Browser")
         self.setWindowFlags(
@@ -44,6 +51,8 @@ class PIPVideoBrowser(QMainWindow):
         
         # Create web engine first (needed by control buttons)
         self.web_view = QWebEngineView()
+        page = QWebEnginePage(self.profile, self.web_view)
+        self.web_view.setPage(page)
         
         # Compact mode button (shown in compact mode, top)
         self.maximize_btn = QPushButton("⛶")
