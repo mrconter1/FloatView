@@ -194,6 +194,9 @@ class PIPVideoBrowser(QMainWindow):
         self.web_view.loadProgress.connect(self.on_load_progress)
         self.web_view.loadFinished.connect(self.on_load_finished)
         
+        # Connect URL changed signal to update URL bar
+        self.web_view.urlChanged.connect(self.on_url_changed)
+        
         # Add web engine to layout (fills remaining space)
         main_layout.addWidget(self.web_view, 1)
         
@@ -286,6 +289,10 @@ class PIPVideoBrowser(QMainWindow):
             # Search Google for non-URL input
             search_url = f"https://www.google.com/search?q={url.replace(' ', '+')}"
             self.web_view.setUrl(QUrl(search_url))
+
+    def on_url_changed(self):
+        """Update URL bar when the web view's URL changes"""
+        self.url_bar.setText(self.web_view.url().toString())
 
     def set_position(self, x, y):
         """Non-blocking position change"""
