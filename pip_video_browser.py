@@ -350,6 +350,9 @@ class PIPVideoBrowser(QMainWindow):
         # Enable fullscreen support for video players
         page.settings().setAttribute(QWebEngineSettings.WebAttribute.FullScreenSupportEnabled, True)
         
+        # Set initial zoom to fit content
+        self.web_view.setZoomFactor(1.0)
+        
         # Handle fullscreen requests from web content (YouTube, Netflix, etc.)
         page.fullScreenRequested.connect(self.handle_fullscreen_request)
         
@@ -544,6 +547,7 @@ class PIPVideoBrowser(QMainWindow):
         )
         self.show()
         self.apply_rounded_corners()
+        self.adjust_web_zoom()
         
         # Start screen monitoring in compact mode (unless test_movement is enabled)
         if not self.test_movement:
@@ -562,6 +566,7 @@ class PIPVideoBrowser(QMainWindow):
         )
         self.show()
         self.apply_rounded_corners()
+        self.adjust_web_zoom()
         
         # Stop screen monitoring in maximized mode
         self.stop_screen_monitoring()
@@ -591,6 +596,29 @@ class PIPVideoBrowser(QMainWindow):
         painter.end()
         
         self.setMask(mask)
+    
+    def adjust_web_zoom(self):
+        """Adjust web view zoom to fit content in window"""
+        # Calculate zoom factor based on window size
+        # Smaller windows need smaller zoom to fit content
+        width = self.width()
+        height = self.height()
+        
+        # Base size for 1.0 zoom (900x600 - maximized mode default)
+        base_width = 900
+        base_height = 600
+        
+        # Calculate zoom factor based on smaller dimension ratio
+        width_ratio = width / base_width
+        height_ratio = height / base_height
+        
+        # Use the smaller ratio to ensure content fits
+        zoom_factor = min(width_ratio, height_ratio)
+        
+        # Clamp zoom factor between reasonable limits
+        zoom_factor = max(0.25, min(zoom_factor, 3.0))
+        
+        self.web_view.setZoomFactor(zoom_factor)
 
     def on_load_started(self):
         """Handle page load started"""
@@ -904,6 +932,7 @@ class PIPVideoBrowser(QMainWindow):
             # Apply the logical coordinates to Qt window
             self.setGeometry(logical_x1, logical_y1, logical_width, logical_height)
             self.apply_rounded_corners()
+            self.adjust_web_zoom()
             
             # Debug overlay disabled
             # QTimer.singleShot(0, self._update_overlay)
@@ -971,6 +1000,11 @@ class PIPVideoBrowser(QMainWindow):
             # Switch to maximized mode (show controls)
             self.set_maximized_mode()
 
+    def resizeEvent(self, event):
+        """Handle window resize event"""
+        super().resizeEvent(event)
+        self.adjust_web_zoom()
+    
     def closeEvent(self, event):
         """Handle window close event"""
         self.save_state()
