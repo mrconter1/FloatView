@@ -16,7 +16,26 @@ from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEnginePage, QWebEngineS
 from PyQt6.QtCore import Qt, QTimer, QRect, QPoint, QSize, QUrl
 from PyQt6.QtGui import QIcon, QKeySequence
 from PyQt6.QtCore import pyqtSlot
-from PyQt6.QtGui import QPainterPath, QRegion
+from PyQt6.QtGui import QPainterPath, QRegion, QPixmap, QPainter, QPen, QColor
+
+
+def create_app_icon():
+    """Create a simple blue hollow circle icon"""
+    size = 64
+    pixmap = QPixmap(size, size)
+    pixmap.fill(Qt.GlobalColor.transparent)
+    
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    
+    # Draw hollow blue circle
+    pen = QPen(QColor(100, 150, 255), 6)
+    painter.setPen(pen)
+    painter.setBrush(Qt.BrushStyle.NoBrush)
+    painter.drawEllipse(6, 6, size - 12, size - 12)
+    painter.end()
+    
+    return QIcon(pixmap)
 
 
 class SelectAllLineEdit(QLineEdit):
@@ -37,6 +56,7 @@ class ConfigDialog(QDialog):
         self.cache_path = cache_path
         self.storage_path = storage_path
         self.setWindowTitle("Settings")
+        self.setWindowIcon(create_app_icon())
         self.setFixedSize(400, 250)
         self.setStyleSheet("""
             QDialog {
@@ -206,6 +226,7 @@ class PIPVideoBrowser(QMainWindow):
         )
         
         self.setWindowTitle("PIP Video Browser")
+        self.setWindowIcon(create_app_icon())
         self.setWindowFlags(
             Qt.WindowType.Window | 
             Qt.WindowType.WindowStaysOnTopHint |
@@ -605,6 +626,7 @@ class PIPVideoBrowser(QMainWindow):
 
 def main():
     app = QApplication(sys.argv)
+    app.setWindowIcon(create_app_icon())
     start_url = None
     if len(sys.argv) > 1:
         start_url = sys.argv[1]
