@@ -2,13 +2,14 @@ import sys
 import json
 import os
 from pathlib import Path
+import shutil
 
 # Suppress Qt DPI warnings on Windows and configure WebEngine
 os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = ""
 os.environ["QT_DEBUG_PLUGINS"] = "0"
 
 from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QApplication, QProgressBar
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QApplication, QProgressBar, QDialog, QLabel, QMessageBox
 )
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEnginePage
@@ -27,6 +28,149 @@ class SelectAllLineEdit(QLineEdit):
     def mousePressEvent(self, event):
         super().mousePressEvent(event)
         self.selectAll()
+
+
+class ConfigDialog(QDialog):
+    """Modern config dialog for cache and cookie management"""
+    def __init__(self, parent, cache_path, storage_path):
+        super().__init__(parent)
+        self.cache_path = cache_path
+        self.storage_path = storage_path
+        self.setWindowTitle("Settings")
+        self.setFixedSize(400, 250)
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #1e1e2e;
+                border-radius: 8px;
+            }
+            QLabel {
+                color: #cdd6f4;
+                font-family: 'Segoe UI', Arial;
+                font-size: 13px;
+            }
+            QLabel#title {
+                font-size: 16px;
+                font-weight: bold;
+                color: #89b4fa;
+            }
+        """)
+        
+        layout = QVBoxLayout()
+        layout.setSpacing(12)
+        layout.setContentsMargins(20, 20, 20, 20)
+        
+        # Title
+        title = QLabel("⚙️  Settings")
+        title.setObjectName("title")
+        layout.addWidget(title)
+        
+        # Divider
+        divider = QLabel("─" * 35)
+        divider.setStyleSheet("color: #45475a; margin: 5px 0px;")
+        layout.addWidget(divider)
+        
+        # Cache section
+        cache_label = QLabel("Cache Management")
+        cache_label.setStyleSheet("color: #f38ba8; font-weight: bold;")
+        layout.addWidget(cache_label)
+        
+        self.clear_cache_btn = QPushButton("🗑️  Clear Browser Cache")
+        self.clear_cache_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #313244;
+                color: #cdd6f4;
+                border: 1px solid #45475a;
+                border-radius: 6px;
+                padding: 8px 12px;
+                font-weight: 500;
+                font-family: 'Segoe UI', Arial;
+            }
+            QPushButton:hover {
+                background-color: #45475a;
+                border: 1px solid #6c7086;
+            }
+            QPushButton:pressed {
+                background-color: #585b70;
+            }
+        """)
+        self.clear_cache_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.clear_cache_btn.clicked.connect(self.clear_cache)
+        layout.addWidget(self.clear_cache_btn)
+        
+        # Cookies section
+        cookies_label = QLabel("Cookie Management")
+        cookies_label.setStyleSheet("color: #a6e3a1; font-weight: bold; margin-top: 8px;")
+        layout.addWidget(cookies_label)
+        
+        self.clear_cookies_btn = QPushButton("🍪 Clear Cookies")
+        self.clear_cookies_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #313244;
+                color: #cdd6f4;
+                border: 1px solid #45475a;
+                border-radius: 6px;
+                padding: 8px 12px;
+                font-weight: 500;
+                font-family: 'Segoe UI', Arial;
+            }
+            QPushButton:hover {
+                background-color: #45475a;
+                border: 1px solid #6c7086;
+            }
+            QPushButton:pressed {
+                background-color: #585b70;
+            }
+        """)
+        self.clear_cookies_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.clear_cookies_btn.clicked.connect(self.clear_cookies)
+        layout.addWidget(self.clear_cookies_btn)
+        
+        layout.addStretch()
+        
+        self.setLayout(layout)
+        
+        # Center dialog on parent
+        if parent:
+            parent_geo = parent.geometry()
+            dialog_x = parent_geo.x() + (parent_geo.width() - self.width()) // 2
+            dialog_y = parent_geo.y() + (parent_geo.height() - self.height()) // 2
+            self.move(dialog_x, dialog_y)
+    
+    def clear_cache(self):
+        """Clear browser cache"""
+        try:
+            if os.path.exists(self.cache_path):
+                shutil.rmtree(self.cache_path)
+                os.makedirs(self.cache_path, exist_ok=True)
+            QMessageBox.information(self, "Success", "✓ Browser cache cleared successfully!")
+            self.clear_cache_btn.setText("✓ Cache cleared!")
+            self.clear_cache_btn.setEnabled(False)
+            QTimer.singleShot(2000, lambda: self.reset_cache_button())
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to clear cache: {str(e)}")
+    
+    def clear_cookies(self):
+        """Clear cookies"""
+        try:
+            if os.path.exists(self.storage_path):
+                shutil.rmtree(self.storage_path)
+                os.makedirs(self.storage_path, exist_ok=True)
+            QMessageBox.information(self, "Success", "✓ Cookies cleared successfully!")
+            self.clear_cookies_btn.setText("✓ Cookies cleared!")
+            self.clear_cookies_btn.setEnabled(False)
+            QTimer.singleShot(2000, lambda: self.reset_cookies_button())
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to clear cookies: {str(e)}")
+    
+    def reset_cache_button(self):
+        """Reset cache button after clearing"""
+        self.clear_cache_btn.setText("🗑️  Clear Browser Cache")
+        self.clear_cache_btn.setEnabled(True)
+    
+    def reset_cookies_button(self):
+        """Reset cookies button after clearing"""
+        self.clear_cookies_btn.setText("🍪 Clear Cookies")
+        self.clear_cookies_btn.setEnabled(True)
 
 
 class PIPVideoBrowser(QMainWindow):
@@ -237,6 +381,14 @@ class PIPVideoBrowser(QMainWindow):
         self.minimize_btn.clicked.connect(self.toggle_mode)
         control_layout.addWidget(self.minimize_btn)
         
+        self.settings_btn = QPushButton("⚙️")
+        self.settings_btn.setFixedWidth(30)
+        self.settings_btn.setFixedHeight(30)
+        self.settings_btn.setStyleSheet(button_style)
+        self.settings_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.settings_btn.clicked.connect(self.open_config_menu)
+        control_layout.addWidget(self.settings_btn)
+        
         self.close_btn = QPushButton("✕")
         self.close_btn.setFixedWidth(30)
         self.close_btn.setFixedHeight(30)
@@ -368,6 +520,13 @@ class PIPVideoBrowser(QMainWindow):
     def on_url_changed(self):
         """Update URL bar when the web view's URL changes"""
         self.url_bar.setText(self.web_view.url().toString())
+
+    def open_config_menu(self):
+        """Open the configuration menu dialog"""
+        cache_path = str(Path.home() / ".pip_video_browser" / "cache")
+        storage_path = str(Path.home() / ".pip_video_browser" / "web_data")
+        config_dialog = ConfigDialog(self, cache_path, storage_path)
+        config_dialog.exec()
 
     def set_position(self, x, y):
         """Non-blocking position change"""
