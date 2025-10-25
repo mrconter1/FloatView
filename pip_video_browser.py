@@ -4,6 +4,12 @@ import os
 from pathlib import Path
 import shutil
 import random
+import threading
+import hashlib
+import time
+import numpy as np
+import bettercam
+from seed_growth_core import grow_seeds
 
 # Suppress Qt DPI warnings on Windows and configure WebEngine
 os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = ""
@@ -12,9 +18,10 @@ os.environ["QT_DEBUG_PLUGINS"] = "0"
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QApplication, QProgressBar, QDialog, QLabel, QMessageBox
 )
+import tkinter as tk
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEnginePage, QWebEngineSettings
-from PyQt6.QtCore import Qt, QTimer, QRect, QPoint, QSize, QUrl
+from PyQt6.QtCore import Qt, QTimer, QRect, QPoint, QSize, QUrl, pyqtSignal, QObject
 from PyQt6.QtGui import QIcon, QKeySequence
 from PyQt6.QtCore import pyqtSlot
 from PyQt6.QtGui import QPainterPath, QRegion, QPixmap, QPainter, QPen, QColor
@@ -37,6 +44,53 @@ def create_app_icon():
     painter.end()
     
     return QIcon(pixmap)
+
+
+def get_block_hash(pixels):
+    """Get a hash of pixel data for a block"""
+    return hashlib.md5(pixels.tobytes()).hexdigest()
+
+
+def get_all_block_hashes(screen_pixels, block_size):
+    """Divide screen into blocks and get hash for each block"""
+    height, width = screen_pixels.shape[:2]
+    
+    block_hashes = {}
+    
+    for y in range(0, height, block_size):
+        for x in range(0, width, block_size):
+            block_y_end = min(y + block_size, height)
+            block_x_end = min(x + block_size, width)
+            
+            block_pixels = screen_pixels[y:block_y_end, x:block_x_end]
+            block_key = (y // block_size, x // block_size)
+            block_hashes[block_key] = get_block_hash(block_pixels)
+    
+    return block_hashes
+
+
+def calculate_change_percentage(previous_hashes, current_hashes):
+    """Calculate percentage of blocks that changed"""
+    if not previous_hashes:
+        return 0.0
+    
+    changed_count = 0
+    total_count = len(current_hashes)
+    
+    for block_key in current_hashes:
+        if block_key not in previous_hashes or previous_hashes[block_key] != current_hashes[block_key]:
+            changed_count += 1
+    
+    percentage = (changed_count / total_count) * 100 if total_count > 0 else 0
+    return percentage
+
+
+def load_monitoring_config(config_path='config.json'):
+    """Load configuration from JSON file"""
+    if os.path.exists(config_path):
+        with open(config_path, 'r') as f:
+            return json.load(f)
+    return {}
 
 
 class SelectAllLineEdit(QLineEdit):
@@ -200,6 +254,11 @@ class ConfigDialog(QDialog):
         self.clear_cookies_btn.setEnabled(True)
 
 
+class ScreenMonitorSignals(QObject):
+    """Qt signals for thread-safe communication"""
+    rectangle_detected = pyqtSignal(int, int, int, int, int)  # x1, y1, x2, y2, area
+
+
 class PIPVideoBrowser(QMainWindow):
     def __init__(self, start_url=None, test_movement=False):
         super().__init__()
@@ -209,6 +268,25 @@ class PIPVideoBrowser(QMainWindow):
         self.start_url = start_url or "https://youtube.com"
         self.config_file = Path.home() / ".pip_video_browser" / "config.json"
         self.config_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Screen monitoring setup
+        self.monitoring_enabled = False
+        self.monitor_thread = None
+        self.monitor_signals = ScreenMonitorSignals()
+        self.monitor_signals.rectangle_detected.connect(self.on_rectangle_detected)
+        self.previous_hashes = None
+        self.camera = None
+        self.camera_lock = threading.Lock()
+        
+        # Load monitoring config
+        self.monitor_config = load_monitoring_config()
+        self.screen_width = 0
+        self.screen_height = 0
+        
+        # Debug overlay
+        self.overlay_window = None
+        self.overlay_canvas = None
+        self.detected_rect = None
         
         # Create persistent web engine profile for cookies and browser data
         storage_path = str(Path.home() / ".pip_video_browser" / "web_data")
@@ -466,6 +544,10 @@ class PIPVideoBrowser(QMainWindow):
         )
         self.show()
         self.apply_rounded_corners()
+        
+        # Start screen monitoring in compact mode (unless test_movement is enabled)
+        if not self.test_movement:
+            self.start_screen_monitoring()
 
     def set_maximized_mode(self):
         """Switch to maximized mode (full controls)"""
@@ -480,6 +562,9 @@ class PIPVideoBrowser(QMainWindow):
         )
         self.show()
         self.apply_rounded_corners()
+        
+        # Stop screen monitoring in maximized mode
+        self.stop_screen_monitoring()
 
     def toggle_mode(self):
         """Toggle between compact and maximized modes"""
@@ -562,8 +647,8 @@ class PIPVideoBrowser(QMainWindow):
 
     def random_move_and_resize(self):
         """Move window to random position and size (for testing) - only in compact mode"""
-        # Only move when in compact mode
-        if self.is_maximized_mode:
+        # Only move when in compact mode and monitoring is not enabled
+        if self.is_maximized_mode or self.monitoring_enabled:
             return
         
         # Get screen geometry
@@ -582,6 +667,246 @@ class PIPVideoBrowser(QMainWindow):
         # Apply new geometry
         self.setGeometry(new_x, new_y, new_width, new_height)
         self.apply_rounded_corners()
+    
+    def start_screen_monitoring(self):
+        """Start the screen monitoring thread"""
+        if self.monitor_thread is not None and self.monitor_thread.is_alive():
+            return
+        
+        self.monitoring_enabled = True
+        
+        # Initialize camera if not already created
+        with self.camera_lock:
+            if self.camera is None:
+                try:
+                    self.camera = bettercam.create(output_color="BGR")
+                    print("📷 Camera initialized")
+                except Exception as e:
+                    print(f"Failed to initialize camera: {e}")
+                    return
+        
+        # Debug overlay disabled
+        # self._create_overlay_window()
+        
+        self.monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)
+        self.monitor_thread.start()
+        print("🔍 Screen monitoring started")
+    
+    def _create_overlay_window(self):
+        """Create transparent overlay window for debug visualization"""
+        if self.overlay_window is not None:
+            return
+        
+        try:
+            self.overlay_window = tk.Tk()
+            self.overlay_window.attributes('-topmost', True)
+            self.overlay_window.overrideredirect(True)
+            self.overlay_window.attributes('-transparentcolor', 'white')
+            
+            # Get screen dimensions
+            screen = QApplication.primaryScreen().geometry()
+            self.overlay_window.geometry(f"{screen.width()}x{screen.height()}+0+0")
+            
+            self.overlay_canvas = tk.Canvas(self.overlay_window, bg='white', highlightthickness=0)
+            self.overlay_canvas.pack(fill=tk.BOTH, expand=True)
+            
+            print("🖼️  Debug overlay created")
+        except Exception as e:
+            print(f"Failed to create overlay: {e}")
+    
+    def _update_overlay(self):
+        """Update the debug overlay to show detected rectangle"""
+        if self.overlay_canvas is None or self.detected_rect is None:
+            return
+        
+        try:
+            self.overlay_canvas.delete("all")
+            x1, y1, x2, y2 = self.detected_rect
+            
+            # Draw detected rectangle in red (physical pixels)
+            self.overlay_canvas.create_rectangle(x1, y1, x2, y2, outline='red', width=3, fill='')
+            
+            # Get DPI scaling to convert Qt logical pixels back to physical
+            screen = QApplication.primaryScreen()
+            dpi_scale = screen.devicePixelRatio()
+            
+            # Draw PIP window position in blue - convert logical to physical pixels
+            frame_geo = self.frameGeometry()
+            pip_logical_x = frame_geo.x()
+            pip_logical_y = frame_geo.y()
+            pip_logical_w = frame_geo.width()
+            pip_logical_h = frame_geo.height()
+            
+            # Convert to physical pixels for overlay
+            pip_x = int(pip_logical_x * dpi_scale)
+            pip_y = int(pip_logical_y * dpi_scale)
+            pip_w = int(pip_logical_w * dpi_scale)
+            pip_h = int(pip_logical_h * dpi_scale)
+            
+            print(f"🔵 Blue rect (PIP physical): ({pip_x}, {pip_y}) to ({pip_x + pip_w}, {pip_y + pip_h})")
+            print(f"🔴 Red rect (detected physical): ({x1}, {y1}) to ({x2}, {y2})")
+            
+            self.overlay_canvas.create_rectangle(
+                pip_x, pip_y, 
+                pip_x + pip_w, pip_y + pip_h,
+                outline='blue', width=2, fill=''
+            )
+            
+            self.overlay_window.update()
+        except Exception as e:
+            print(f"Error updating overlay: {e}")
+    
+    def stop_screen_monitoring(self):
+        """Stop the screen monitoring thread"""
+        self.monitoring_enabled = False
+        
+        # Destroy overlay window
+        if self.overlay_window is not None:
+            try:
+                self.overlay_window.destroy()
+            except:
+                pass
+            self.overlay_window = None
+            self.overlay_canvas = None
+        
+        print("🛑 Screen monitoring stopped")
+    
+    def _monitor_loop(self):
+        """Background monitoring loop"""
+        try:
+            # Initial capture to get screen dimensions
+            with self.camera_lock:
+                if self.camera is None:
+                    print("Camera not initialized")
+                    return
+                screen_capture = self.camera.grab()
+            
+            if screen_capture is None:
+                print("Failed to grab initial screen capture")
+                return
+            
+            screen_pixels = np.array(screen_capture)
+            screen_pixels = screen_pixels[:, :, [2, 1, 0]]
+            
+            self.screen_height, self.screen_width = screen_pixels.shape[:2]
+            
+            # Perform initial seed growth search
+            print("🌱 Performing initial seed growth search...")
+            self._search_and_emit(screen_pixels)
+            
+            # Initialize block hashes
+            block_size = self.monitor_config.get('block_size', 100)
+            self.previous_hashes = get_all_block_hashes(screen_pixels, block_size)
+            
+            update_rate = self.monitor_config.get('update_rate', 0.1)
+            change_threshold = self.monitor_config.get('change_threshold', 30.0)
+            iteration = 0
+            
+            while self.monitoring_enabled:
+                time.sleep(update_rate)
+                iteration += 1
+                
+                with self.camera_lock:
+                    if self.camera is None:
+                        break
+                    screen_capture = self.camera.grab()
+                
+                if screen_capture is None:
+                    continue
+                
+                try:
+                    screen_pixels = np.array(screen_capture)
+                    if screen_pixels.ndim < 3:
+                        continue
+                    screen_pixels = screen_pixels[:, :, [2, 1, 0]]
+                except (IndexError, ValueError):
+                    continue
+                
+                current_hashes = get_all_block_hashes(screen_pixels, block_size)
+                change_percentage = calculate_change_percentage(self.previous_hashes, current_hashes)
+                
+                if change_percentage > change_threshold:
+                    print(f"[{iteration:03d}] {change_percentage:5.1f}% blocks changed - searching for new rectangle")
+                    self._search_and_emit(screen_pixels)
+                
+                self.previous_hashes = current_hashes
+        
+        except Exception as e:
+            print(f"Monitor error: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _search_and_emit(self, screen_pixels):
+        """Search for rectangle and emit signal"""
+        try:
+            # Get exclusion zone from config (currently 0% in config.json)
+            exclude_center_width = self.monitor_config.get('exclude_center_width', 0)
+            exclude_center_height = self.monitor_config.get('exclude_center_height', 0)
+            
+            exclude_width = int(self.screen_width * exclude_center_width / 100)
+            exclude_height = int(self.screen_height * exclude_center_height / 100)
+            
+            exclude_x1 = (self.screen_width - exclude_width) // 2
+            exclude_y1 = (self.screen_height - exclude_height) // 2
+            exclude_x2 = exclude_x1 + exclude_width
+            exclude_y2 = exclude_y1 + exclude_height
+            
+            exclusion_zone = (exclude_x1, exclude_y1, exclude_x2, exclude_y2) if exclude_width > 0 and exclude_height > 0 else None
+            
+            results = grow_seeds(
+                num_seeds=self.monitor_config.get('seeds', 100),
+                num_keep=1,
+                screen_pixels=screen_pixels,
+                lookahead_pixels=self.monitor_config.get('lookahead_pixels', 5),
+                wall_thickness=self.monitor_config.get('wall_thickness', 5),
+                color_mode=self.monitor_config.get('color_mode', 'average'),
+                jitter=self.monitor_config.get('jitter', 25),
+                growth_pixels=self.monitor_config.get('growth_pixels', 1),
+                pixel_sample_rate=self.monitor_config.get('pixel_sample_rate', 1),
+                no_overlap=self.monitor_config.get('no_overlap', True),
+                exclusion_zone=exclusion_zone
+            )
+            
+            if results:
+                coords, area = results[0]
+                x1, y1, x2, y2 = coords
+                self.monitor_signals.rectangle_detected.emit(x1, y1, x2, y2, area)
+                print(f"  → Rectangle detected: ({x1}, {y1}, {x2}, {y2}) - {area} px²")
+        
+        except Exception as e:
+            print(f"Error in seed growth: {e}")
+    
+    def on_rectangle_detected(self, x1, y1, x2, y2, area):
+        """Handle detected rectangle - position PIP window inside it"""
+        # Store detected rectangle for overlay
+        self.detected_rect = (x1, y1, x2, y2)
+        
+        if not self.is_maximized_mode:  # Only reposition in compact mode
+            # Get DPI scaling factor
+            screen = QApplication.primaryScreen()
+            dpi_scale = screen.devicePixelRatio()
+            
+            print(f"🖥️  DPI Scale Factor: {dpi_scale}")
+            
+            # Convert physical pixels to logical pixels
+            logical_x1 = int(x1 / dpi_scale)
+            logical_y1 = int(y1 / dpi_scale)
+            logical_x2 = int(x2 / dpi_scale)
+            logical_y2 = int(y2 / dpi_scale)
+            
+            logical_width = logical_x2 - logical_x1
+            logical_height = logical_y2 - logical_y1
+            
+            print(f"📐 Detected rect (physical): ({x1}, {y1}) to ({x2}, {y2})")
+            print(f"📐 Detected rect (logical): ({logical_x1}, {logical_y1}) to ({logical_x2}, {logical_y2})")
+            print(f"📍 Positioning PIP using logical coordinates")
+            
+            # Apply the logical coordinates to Qt window
+            self.setGeometry(logical_x1, logical_y1, logical_width, logical_height)
+            self.apply_rounded_corners()
+            
+            # Debug overlay disabled
+            # QTimer.singleShot(0, self._update_overlay)
 
     def set_size(self, width, height):
         """Non-blocking resize"""
@@ -649,6 +974,19 @@ class PIPVideoBrowser(QMainWindow):
     def closeEvent(self, event):
         """Handle window close event"""
         self.save_state()
+        
+        # Stop screen monitoring
+        self.stop_screen_monitoring()
+        
+        # Release camera
+        with self.camera_lock:
+            if self.camera:
+                try:
+                    self.camera.release()
+                except:
+                    pass
+                self.camera = None
+        
         # Properly clean up web page before closing
         if hasattr(self, 'web_view') and self.web_view.page():
             self.web_view.setPage(None)
