@@ -13,6 +13,17 @@ from PyQt6.QtCore import pyqtSlot
 from PyQt6.QtGui import QPainterPath, QRegion
 
 
+class SelectAllLineEdit(QLineEdit):
+    """QLineEdit that selects all text on focus or click"""
+    def focusInEvent(self, event):
+        super().focusInEvent(event)
+        self.selectAll()
+    
+    def mousePressEvent(self, event):
+        super().mousePressEvent(event)
+        self.selectAll()
+
+
 class PIPVideoBrowser(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -136,7 +147,7 @@ class PIPVideoBrowser(QMainWindow):
         self.refresh_btn.clicked.connect(self.web_view.reload)
         control_layout.addWidget(self.refresh_btn)
         
-        self.url_bar = QLineEdit()
+        self.url_bar = SelectAllLineEdit()
         self.url_bar.setPlaceholderText("Enter URL...")
         self.url_bar.returnPressed.connect(self.navigate_to_url)
         self.url_bar.setStyleSheet("""
