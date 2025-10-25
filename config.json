@@ -1,0 +1,17 @@
+{
+  "seeds": 100,
+  "lookahead_pixels": 5,
+  "wall_thickness": 5,
+  "color_mode": "average",
+  "no_overlap": true,
+  "jitter": 25,
+  "growth_pixels": 1,
+  "pixel_sample_rate": 1,
+  "block_size": 100,
+  "update_rate": 0.1,
+  "change_threshold": 30,
+  "exclude_center_width": 0,
+  "exclude_center_height": 0,
+  "show_exclusion_zone": false
+}
+
