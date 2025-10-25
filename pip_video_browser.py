@@ -81,10 +81,10 @@ class PIPVideoBrowser(QMainWindow):
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: rgba(100, 150, 255, 0.8);
+                background-color: rgba(100, 150, 255, 0.15);
             }
             QPushButton:pressed {
-                background-color: rgba(80, 120, 200, 0.9);
+                background-color: rgba(80, 120, 200, 0.25);
             }
         """)
         self.maximize_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -108,10 +108,10 @@ class PIPVideoBrowser(QMainWindow):
                 padding: 5px;
             }
             QPushButton:hover {
-                background-color: rgba(100, 150, 255, 0.8);
+                background-color: rgba(100, 150, 255, 0.15);
             }
             QPushButton:pressed {
-                background-color: rgba(80, 120, 200, 0.9);
+                background-color: rgba(80, 120, 200, 0.25);
             }
         """
         
@@ -148,10 +148,10 @@ class PIPVideoBrowser(QMainWindow):
                 border: none;
             }
             QLineEdit:hover {
-                background-color: rgba(100, 150, 255, 0.8);
+                background-color: rgba(100, 150, 255, 0.15);
             }
             QLineEdit:focus {
-                background-color: rgba(80, 120, 200, 0.9);
+                background-color: rgba(80, 120, 200, 0.25);
             }
         """)
         control_layout.addWidget(self.url_bar)
