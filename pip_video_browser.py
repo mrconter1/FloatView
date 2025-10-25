@@ -3,7 +3,7 @@ import json
 import os
 from pathlib import Path
 from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QApplication
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QApplication, QProgressBar
 )
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEnginePage
@@ -166,6 +166,28 @@ class PIPVideoBrowser(QMainWindow):
         
         main_layout.addWidget(self.control_bar)
         
+        # Add loading progress bar (shown under control bar)
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setMaximumHeight(3)
+        self.progress_bar.setStyleSheet("""
+            QProgressBar {
+                border: none;
+                background-color: transparent;
+                margin: 0px;
+                padding: 0px;
+            }
+            QProgressBar::chunk {
+                background-color: rgba(100, 150, 255, 0.9);
+            }
+        """)
+        self.progress_bar.hide()
+        main_layout.addWidget(self.progress_bar)
+        
+        # Connect web view loading signals
+        self.web_view.loadStarted.connect(self.on_load_started)
+        self.web_view.loadProgress.connect(self.on_load_progress)
+        self.web_view.loadFinished.connect(self.on_load_finished)
+        
         # Add web engine to layout (fills remaining space)
         main_layout.addWidget(self.web_view, 1)
         
@@ -228,6 +250,20 @@ class PIPVideoBrowser(QMainWindow):
         painter.end()
         
         self.setMask(mask)
+
+    def on_load_started(self):
+        """Handle page load started"""
+        self.progress_bar.show()
+        self.progress_bar.setValue(0)
+
+    def on_load_progress(self, progress):
+        """Handle page load progress"""
+        self.progress_bar.setValue(progress)
+
+    def on_load_finished(self):
+        """Handle page load finished"""
+        self.progress_bar.setValue(100)
+        self.progress_bar.hide()
 
     def navigate_to_url(self):
         """Navigate to URL from address bar"""
