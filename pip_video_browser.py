@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QApplication, QProgressBar, QDialog, QLabel, QMessageBox
 )
 from PyQt6.QtWebEngineWidgets import QWebEngineView
-from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEnginePage
+from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEnginePage, QWebEngineSettings
 from PyQt6.QtCore import Qt, QTimer, QRect, QPoint, QSize, QUrl
 from PyQt6.QtGui import QIcon, QKeySequence
 from PyQt6.QtCore import pyqtSlot
@@ -183,6 +183,7 @@ class PIPVideoBrowser(QMainWindow):
     def __init__(self, start_url=None):
         super().__init__()
         self.is_maximized_mode = False
+        self.is_web_fullscreen = False
         self.start_url = start_url or "https://youtube.com"
         self.config_file = Path.home() / ".pip_video_browser" / "config.json"
         self.config_file.parent.mkdir(parents=True, exist_ok=True)
@@ -238,6 +239,12 @@ class PIPVideoBrowser(QMainWindow):
         # Create web engine first (needed by control buttons)
         self.web_view = QWebEngineView()
         page = QWebEnginePage(self.profile, self.web_view)
+        
+        # Enable fullscreen support for video players
+        page.settings().setAttribute(QWebEngineSettings.WebAttribute.FullScreenSupportEnabled, True)
+        
+        # Handle fullscreen requests from web content (YouTube, Netflix, etc.)
+        page.fullScreenRequested.connect(self.handle_fullscreen_request)
         
         # Inject script to suppress JavaScript console messages
         script = """
@@ -591,6 +598,43 @@ class PIPVideoBrowser(QMainWindow):
                 print(f"Error loading state: {e}")
         else:
             self.move(100, 100)
+
+    def handle_fullscreen_request(self, request):
+        """Handle fullscreen requests from web content (YouTube, Netflix, etc.)"""
+        if request.toggleOn():
+            # Entering fullscreen - accept the request and hide controls
+            request.accept()
+            self.is_web_fullscreen = True
+            
+            # Hide all UI controls to give maximum space to video
+            self.control_bar.hide()
+            self.maximize_btn.hide()
+            self.progress_bar.hide()
+            
+            # Optionally expand the window (but don't go to system fullscreen)
+            # Store current geometry to restore later
+            self.pre_fullscreen_geometry = self.geometry()
+            
+            # You can resize to a larger size or keep current size
+            # Uncomment the next line if you want to expand to a larger window
+            # self.resize(1280, 720)
+            
+        else:
+            # Exiting fullscreen - accept the request and restore controls
+            request.accept()
+            self.is_web_fullscreen = False
+            
+            # Restore the appropriate UI mode
+            if self.is_maximized_mode:
+                self.control_bar.show()
+                self.maximize_btn.hide()
+            else:
+                self.control_bar.hide()
+                self.maximize_btn.show()
+            
+            # Restore previous geometry if we changed it
+            if hasattr(self, 'pre_fullscreen_geometry'):
+                self.setGeometry(self.pre_fullscreen_geometry)
 
     def closeEvent(self, event):
         """Handle window close event"""
