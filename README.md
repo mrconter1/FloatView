@@ -1,6 +1,6 @@
 # FloatView - Intelligent PIP Video Browser
 
-An always-on-top video browser that automatically positions itself in static screen areas.
+An always-on-top video browser that automatically positions itself in unused screen areas. It monitors your screen for changes and finds the largest calm, non-changing rectangular region to occupy - like empty desktop space, unused document windows, or browser backgrounds. When you move windows or your layout changes significantly, it automatically repositions itself to stay out of your way while remaining visible.
 
 ## How It Works
 
